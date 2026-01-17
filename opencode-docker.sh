@@ -40,7 +40,8 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 print_help() {
-    head -30 "$0" | grep -E '^#' | sed 's/^# \?//'
+    # Extract help text between the first '# Usage:' and the closing '#'
+    sed -n '/^# Usage:/,/^[^#]/{ /^#/s/^# \?//p }' "$0"
 }
 
 log_info() {
@@ -59,10 +60,18 @@ log_error() {
 while [[ $# -gt 0 ]]; do
     case $1 in
         -c|--config)
+            if [[ -z "${2:-}" || "$2" == -* ]]; then
+                log_error "Option $1 requires a path argument"
+                exit 1
+            fi
             CONFIG_DIR="$2"
             shift 2
             ;;
         -w|--workdir)
+            if [[ -z "${2:-}" || "$2" == -* ]]; then
+                log_error "Option $1 requires a path argument"
+                exit 1
+            fi
             WORK_DIR="$2"
             shift 2
             ;;
@@ -130,15 +139,27 @@ if [[ -z "$IMAGE_EXISTS" ]] || [[ "$FORCE_BUILD" == "true" ]]; then
     log_info "Docker image built successfully."
 fi
 
+# Container user home directory (change if running as non-root)
+CONTAINER_HOME="/root"
+
 # Prepare docker run command
 DOCKER_CMD=(
     docker run
     --rm
-    -it
+)
+
+# Handle TTY: use -it if terminal is available, otherwise just -i
+if [[ -t 0 && -t 1 ]]; then
+    DOCKER_CMD+=(-it)
+else
+    DOCKER_CMD+=(-i)
+fi
+
+DOCKER_CMD+=(
     -v "$WORK_DIR:/work"
-    -v "$CONFIG_DIR:/root/.config/opencode"
+    -v "$CONFIG_DIR:$CONTAINER_HOME/.config/opencode"
     -w /work
-    -e "TERM=xterm-256color"
+    -e "TERM=${TERM:-xterm-256color}"
 )
 
 # Pass through API keys if they exist in the environment
