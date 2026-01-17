@@ -5,7 +5,7 @@
 # This script will:
 #   1. Build the Docker image
 #   2. Create the opencode config directory if it doesn't exist
-#   3. Add an alias to your shell config (bash/zsh)
+#   3. Add a function to your shell config (bash/zsh)
 #
 # After running this script, you can use 'ocd' from anywhere to launch opencode in Docker.
 #
@@ -15,30 +15,38 @@ set -e
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Colors for output (only if terminal supports it)
+if [[ -t 1 ]]; then
+    RED=$'\033[0;31m'
+    GREEN=$'\033[0;32m'
+    YELLOW=$'\033[1;33m'
+    BLUE=$'\033[0;34m'
+    NC=$'\033[0m'
+else
+    RED=''
+    GREEN=''
+    YELLOW=''
+    BLUE=''
+    NC=''
+fi
 
 IMAGE_NAME="opencode-container:latest"
 ALIAS_NAME="ocd"
 
 log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+    printf '%s[INFO]%s %s\n' "$GREEN" "$NC" "$1"
 }
 
 log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
+    printf '%s[WARN]%s %s\n' "$YELLOW" "$NC" "$1"
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    printf '%s[ERROR]%s %s\n' "$RED" "$NC" "$1"
 }
 
 log_step() {
-    echo -e "${BLUE}[STEP]${NC} $1"
+    printf '%s[STEP]%s %s\n' "$BLUE" "$NC" "$1"
 }
 
 echo ""
@@ -85,12 +93,25 @@ else
     exit 1
 fi
 
-# Detect shell and add alias
-log_step "Setting up shell alias..."
+# Detect shell and set up function
+log_step "Setting up shell function..."
 
 LAUNCHER_PATH="$SCRIPT_DIR/opencode-docker.sh"
 # Use a function instead of alias to handle paths with spaces correctly
 FUNC_LINE="$ALIAS_NAME() { \"$LAUNCHER_PATH\" \"\$@\"; }"
+
+# Check if function already exists and points to the correct path
+check_func_exists() {
+    local file="$1"
+    if [[ ! -f "$file" ]]; then
+        return 1
+    fi
+    # Check if function exists and points to current launcher path
+    if grep -q "^$ALIAS_NAME() { \"$LAUNCHER_PATH\"" "$file" 2>/dev/null; then
+        return 0
+    fi
+    return 1
+}
 
 # Function to add shell function to a config file
 add_func_to_file() {
@@ -101,16 +122,24 @@ add_func_to_file() {
         return 1
     fi
     
-    # Check if function or old alias already exists
+    # Check if function already exists with correct path
+    if check_func_exists "$file"; then
+        log_info "Function '$ALIAS_NAME' already configured correctly in $file"
+        return 0
+    fi
+    
+    # Check if function or old alias exists (needs update)
     if grep -qE "^$ALIAS_NAME\(\)|^alias $ALIAS_NAME=" "$file" 2>/dev/null; then
-        log_warn "Function/alias '$ALIAS_NAME' already exists in $file"
-        # Remove old alias-style definition if present
+        log_warn "Updating existing function/alias '$ALIAS_NAME' in $file"
+        # Remove old definitions
         if [[ "$OSTYPE" == "darwin"* ]]; then
             sed -i '' "/^alias $ALIAS_NAME=/d" "$file"
-            sed -i '' "/^$ALIAS_NAME()/d" "$file"
+            sed -i '' "/^$ALIAS_NAME() {/d" "$file"
+            sed -i '' "/^# OpenCode Docker/d" "$file"
         else
             sed -i "/^alias $ALIAS_NAME=/d" "$file"
-            sed -i "/^$ALIAS_NAME()/d" "$file"
+            sed -i "/^$ALIAS_NAME() {/d" "$file"
+            sed -i "/^# OpenCode Docker/d" "$file"
         fi
     fi
     
@@ -126,6 +155,12 @@ add_func_to_file() {
 }
 
 FUNC_ADDED=false
+ALREADY_CONFIGURED=false
+
+# Check if already fully configured
+if check_func_exists "$HOME/.zshrc" || check_func_exists "$HOME/.bashrc" || check_func_exists "$HOME/.bash_profile"; then
+    ALREADY_CONFIGURED=true
+fi
 
 # Check for zsh (common on macOS)
 if [[ -f "$HOME/.zshrc" ]]; then
@@ -153,14 +188,19 @@ echo "========================================"
 echo ""
 echo "Usage:"
 echo ""
-echo "  ${GREEN}$ALIAS_NAME${NC}                    - Run opencode in current directory"
-echo "  ${GREEN}$ALIAS_NAME -c /path/to/config${NC} - Use custom config directory"
-echo "  ${GREEN}$ALIAS_NAME -w /path/to/project${NC} - Run in specific directory"
-echo "  ${GREEN}$ALIAS_NAME -s${NC}                 - Start a shell in the container"
-echo "  ${GREEN}$ALIAS_NAME -b${NC}                 - Force rebuild the image"
-echo "  ${GREEN}$ALIAS_NAME -h${NC}                 - Show all options"
+printf '  %s%s%s                    - Run opencode in current directory\n' "$GREEN" "$ALIAS_NAME" "$NC"
+printf '  %s%s -c /path/to/config%s - Use custom config directory\n' "$GREEN" "$ALIAS_NAME" "$NC"
+printf '  %s%s -w /path/to/project%s - Run in specific directory\n' "$GREEN" "$ALIAS_NAME" "$NC"
+printf '  %s%s -s%s                 - Start a shell in the container\n' "$GREEN" "$ALIAS_NAME" "$NC"
+printf '  %s%s -b%s                 - Force rebuild the image\n' "$GREEN" "$ALIAS_NAME" "$NC"
+printf '  %s%s -h%s                 - Show all options\n' "$GREEN" "$ALIAS_NAME" "$NC"
 echo ""
-echo "To use the alias now, either:"
-echo "  1. Open a new terminal, or"
-echo "  2. Run: ${YELLOW}source ~/.zshrc${NC} (or ~/.bashrc)"
-echo ""
+
+if [[ "$ALREADY_CONFIGURED" == "true" ]]; then
+    log_info "Shell function was already configured. Image has been rebuilt."
+else
+    echo "To use the function now, either:"
+    echo "  1. Open a new terminal, or"
+    printf '  2. Run: %ssource ~/.zshrc%s (or ~/.bashrc)\n' "$YELLOW" "$NC"
+    echo ""
+fi
