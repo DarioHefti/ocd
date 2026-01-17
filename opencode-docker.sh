@@ -155,12 +155,20 @@ else
     DOCKER_CMD+=(-i)
 fi
 
+# Mount the container AGENTS.md as a read-only file in the config directory
+CONTAINER_AGENTS_MD="$SCRIPT_DIR/AGENTS.md"
+
 DOCKER_CMD+=(
     -v "$WORK_DIR:/work"
     -v "$CONFIG_DIR:$CONTAINER_HOME/.config/opencode"
     -w /work
     -e "TERM=${TERM:-xterm-256color}"
 )
+
+# Mount the container context file if it exists
+if [[ -f "$CONTAINER_AGENTS_MD" ]]; then
+    DOCKER_CMD+=(-v "$CONTAINER_AGENTS_MD:$CONTAINER_HOME/.config/opencode/AGENTS.md:ro")
+fi
 
 # Pass through API keys if they exist in the environment
 [[ -n "$ANTHROPIC_API_KEY" ]] && DOCKER_CMD+=(-e "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY")
