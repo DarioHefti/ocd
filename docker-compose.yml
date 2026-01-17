@@ -7,6 +7,7 @@ services:
     volumes:
       - ${OPENCODE_WORK_DIR:-.}:/work
       - ${OPENCODE_CONFIG_DIR:-~/.config/opencode}:/root/.config/opencode
+      - ${OPENCODE_DATA_DIR:-~/.local/share/opencode}:/root/.local/share/opencode
     working_dir: /work
     tty: true
     stdin_open: true

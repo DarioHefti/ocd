@@ -7,6 +7,7 @@
 #
 # Options:
 #   -c, --config PATH    Use custom config directory (overrides ~/.config/opencode)
+#   -d, --data PATH      Use custom data directory (overrides ~/.local/share/opencode)
 #   -w, --workdir PATH   Use custom working directory (default: current directory)
 #   -b, --build          Force rebuild the Docker image before running
 #   -s, --shell          Start a shell instead of opencode
@@ -28,6 +29,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Defaults
 WORK_DIR="$(pwd)"
 CONFIG_DIR="${HOME}/.config/opencode"
+DATA_DIR="${HOME}/.local/share/opencode"
 FORCE_BUILD=false
 START_SHELL=false
 IMAGE_NAME="opencode-container:latest"
@@ -65,6 +67,14 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             CONFIG_DIR="$2"
+            shift 2
+            ;;
+        -d|--data)
+            if [[ -z "${2:-}" || "$2" == -* ]]; then
+                log_error "Option $1 requires a path argument"
+                exit 1
+            fi
+            DATA_DIR="$2"
             shift 2
             ;;
         -w|--workdir)
@@ -117,6 +127,15 @@ else
     CONFIG_DIR="$(cd "$CONFIG_DIR" && pwd)"
 fi
 
+if [[ -d "$DATA_DIR" ]]; then
+    DATA_DIR="$(cd "$DATA_DIR" && pwd)"
+else
+    log_warn "Data directory does not exist: $DATA_DIR"
+    log_info "Creating data directory..."
+    mkdir -p "$DATA_DIR"
+    DATA_DIR="$(cd "$DATA_DIR" && pwd)"
+fi
+
 # Check if Docker is running
 if ! docker info &>/dev/null; then
     log_error "Docker is not running. Please start Docker and try again."
@@ -161,6 +180,7 @@ CONTAINER_AGENTS_MD="$SCRIPT_DIR/AGENTS.md"
 DOCKER_CMD+=(
     -v "$WORK_DIR:/work"
     -v "$CONFIG_DIR:$CONTAINER_HOME/.config/opencode"
+    -v "$DATA_DIR:$CONTAINER_HOME/.local/share/opencode"
     -w /work
     -e "TERM=${TERM:-xterm-256color}"
 )
@@ -191,6 +211,7 @@ fi
 # Show what we're doing
 log_info "Work directory: $WORK_DIR"
 log_info "Config directory: $CONFIG_DIR"
+log_info "Data directory: $DATA_DIR"
 
 # Run the container
 exec "${DOCKER_CMD[@]}"
