@@ -1,0 +1,17 @@
+services:
+  opencode:
+    image: opencode-container:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ${OPENCODE_WORK_DIR:-.}:/work
+      - ${OPENCODE_CONFIG_DIR:-~/.config/opencode}:/root/.config/opencode
+    working_dir: /work
+    tty: true
+    stdin_open: true
+    environment:
+      - TERM=xterm-256color
+      # Pass through API keys if set in environment
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
