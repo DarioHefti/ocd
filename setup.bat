@@ -146,9 +146,7 @@ echo   "%SCRIPT_DIR%\opencode-docker.bat"
 echo.
 echo Or open a new terminal if you added the directory to PATH.
 echo.
-echo NOTE: These scripts work in both CMD and PowerShell.
-echo       In PowerShell, you may need to run: cmd /c ocd
-echo       Or add a PowerShell alias: Set-Alias ocd "%SCRIPT_DIR%\ocd.bat"
+echo NOTE: This setup is for CMD. For PowerShell, run setup.ps1 instead.
 echo.
 
 endlocal

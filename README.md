@@ -26,22 +26,35 @@ That's it. Run `ocd` from any project directory to launch OpenCode in a containe
 ### Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) installed and running
-- macOS or Linux
+- macOS, Linux, or Windows
 
 ### Setup
 
 1. Clone or download this repository
-2. Run the setup script:
+2. Run the setup script for your platform:
 
+**macOS / Linux:**
 ```bash
 cd opencode-container
 ./setup.sh
 ```
 
+**Windows (PowerShell):**
+```powershell
+cd opencode-container
+.\setup.ps1
+```
+
+**Windows (CMD):**
+```batch
+cd opencode-container
+setup.bat
+```
+
 The setup script will:
 - Build the Docker image
-- Create `~/.config/opencode` if it doesn't exist
-- Add the `ocd` alias to your shell (bash/zsh)
+- Create the config directory if it doesn't exist
+- Add the `ocd` function to your shell profile
 
 ## Usage
 
@@ -153,11 +166,15 @@ The container automatically builds for your system's architecture:
 
 ```
 opencode-container/
-├── Dockerfile           # Container definition
-├── docker-compose.yml   # Compose config (alternative to shell script)
-├── opencode-docker.sh   # Main launcher script
-├── setup.sh             # One-time installation script
-└── README.md            # This file
+├── Dockerfile            # Container definition
+├── docker-compose.yml    # Compose config (alternative to shell script)
+├── opencode-docker.sh    # Main launcher script (macOS/Linux)
+├── opencode-docker.bat   # Main launcher script (Windows CMD)
+├── opencode-docker.ps1   # Main launcher script (Windows PowerShell)
+├── setup.sh              # One-time setup (macOS/Linux)
+├── setup.bat             # One-time setup (Windows CMD)
+├── setup.ps1             # One-time setup (Windows PowerShell)
+└── README.md             # This file
 ```
 
 ## Troubleshooting
