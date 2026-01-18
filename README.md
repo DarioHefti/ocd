@@ -5,21 +5,23 @@ Run [OpenCode](https://opencode.ai) in an isolated Docker container, keeping you
 ## Why Use This?
 
 - **Isolation**: OpenCode only has access to the directory you specify, not your entire system
-- **Consistency**: Same environment on macOS and Linux
+- **Consistency**: Same environment on macOS, Linux, and Windows
 - **Clean**: No global npm packages polluting your system
 - **Portable**: Share your config across machines easily
 
 ## Quick Start
 
+**macOS / Linux:**
 ```bash
-# One-time setup (builds image + adds 'ocd' alias)
 ./setup.sh
-
-# Open a new terminal (or source your shell config), then:
-ocd
 ```
 
-That's it. Run `ocd` from any project directory to launch OpenCode in a container.
+**Windows (PowerShell):**
+```powershell
+.\setup.ps1
+```
+
+Open a new terminal, then run `ocd` from any project directory to launch OpenCode in a container.
 
 ## Installation
 
@@ -181,16 +183,16 @@ opencode-container/
 
 ### "Docker is not running"
 
-Start Docker Desktop (macOS) or the Docker daemon (Linux):
+Start Docker Desktop (macOS/Windows) or the Docker daemon (Linux):
 
 ```bash
 # Linux
 sudo systemctl start docker
 
-# macOS: Open Docker Desktop app
+# macOS / Windows: Open Docker Desktop app
 ```
 
-### "Permission denied" when running scripts
+### "Permission denied" when running scripts (macOS/Linux)
 
 Make the scripts executable:
 
@@ -198,16 +200,22 @@ Make the scripts executable:
 chmod +x *.sh
 ```
 
-### Alias not working
+### Function not working
 
-Either open a new terminal or source your shell config:
+Either open a new terminal or reload your shell config:
 
+**macOS / Linux:**
 ```bash
 # For zsh (default on macOS)
 source ~/.zshrc
 
 # For bash
 source ~/.bashrc
+```
+
+**Windows (PowerShell):**
+```powershell
+. $PROFILE
 ```
 
 ### Rebuild after OpenCode update
@@ -245,7 +253,10 @@ docker-compose run --rm opencode
 
 ## Uninstallation
 
-1. Remove the alias from your shell config (`~/.zshrc` or `~/.bashrc`)
+1. Remove the `ocd` function from your shell config:
+   - **macOS/Linux:** Edit `~/.zshrc` or `~/.bashrc`
+   - **Windows:** Edit your PowerShell profile (`notepad $PROFILE`)
+
 2. Remove the Docker image:
 
 ```bash
