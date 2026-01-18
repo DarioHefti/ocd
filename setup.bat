@@ -75,7 +75,9 @@ echo [STEP] Creating shortcut command...
 set "OCD_BAT=%SCRIPT_DIR%\ocd.bat"
 (
     echo @echo off
-    echo "%SCRIPT_DIR%\opencode-docker.bat" %%*
+    echo setlocal
+    echo call "%SCRIPT_DIR%\opencode-docker.bat" %%*
+    echo endlocal
 ) > "%OCD_BAT%"
 echo [INFO] Created %OCD_BAT%
 
@@ -143,6 +145,10 @@ echo If 'ocd' is not found, you can also run:
 echo   "%SCRIPT_DIR%\opencode-docker.bat"
 echo.
 echo Or open a new terminal if you added the directory to PATH.
+echo.
+echo NOTE: These scripts work in both CMD and PowerShell.
+echo       In PowerShell, you may need to run: cmd /c ocd
+echo       Or add a PowerShell alias: Set-Alias ocd "%SCRIPT_DIR%\ocd.bat"
 echo.
 
 endlocal

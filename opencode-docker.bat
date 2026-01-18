@@ -173,56 +173,45 @@ if "%NEED_BUILD%"=="true" (
 REM Container user home directory
 set "CONTAINER_HOME=/root"
 
-REM Convert Windows paths to Docker-compatible paths
-REM Docker on Windows can use Windows paths directly with proper escaping
-set "DOCKER_WORK_DIR=%WORK_DIR%"
-set "DOCKER_CONFIG_DIR=%CONFIG_DIR%"
-set "DOCKER_DATA_DIR=%DATA_DIR%"
-
-REM Build docker run command
-set "DOCKER_CMD=docker run --rm -it"
-
-REM Add volume mounts
-set "DOCKER_CMD=%DOCKER_CMD% -v "%DOCKER_WORK_DIR%:/work""
-set "DOCKER_CMD=%DOCKER_CMD% -v "%DOCKER_CONFIG_DIR%:%CONTAINER_HOME%/.config/opencode""
-set "DOCKER_CMD=%DOCKER_CMD% -v "%DOCKER_DATA_DIR%:%CONTAINER_HOME%/.local/share/opencode""
-set "DOCKER_CMD=%DOCKER_CMD% -w /work"
-set "DOCKER_CMD=%DOCKER_CMD% -e "TERM=xterm-256color""
-
-REM Mount the container AGENTS.md file if it exists
-if exist "%SCRIPT_DIR%\AGENTS.md" (
-    set "DOCKER_CMD=%DOCKER_CMD% -v "%SCRIPT_DIR%\AGENTS.md:%CONTAINER_HOME%/.config/opencode/AGENTS.md:ro""
-)
-
-REM Pass through API keys if they exist
-if defined ANTHROPIC_API_KEY (
-    set "DOCKER_CMD=%DOCKER_CMD% -e "ANTHROPIC_API_KEY=%ANTHROPIC_API_KEY%""
-)
-if defined OPENAI_API_KEY (
-    set "DOCKER_CMD=%DOCKER_CMD% -e "OPENAI_API_KEY=%OPENAI_API_KEY%""
-)
-
-REM Add image name
-set "DOCKER_CMD=%DOCKER_CMD% %IMAGE_NAME%"
-
-REM Add command
-if "%START_SHELL%"=="true" (
-    echo [INFO] Starting shell in container...
-    set "DOCKER_CMD=%DOCKER_CMD% /bin/bash"
-) else (
-    set "DOCKER_CMD=%DOCKER_CMD% opencode"
-    if not "!OPENCODE_ARGS!"=="" (
-        set "DOCKER_CMD=!DOCKER_CMD! !OPENCODE_ARGS!"
-    )
-)
-
 REM Show what we're doing
 echo [INFO] Work directory: %WORK_DIR%
 echo [INFO] Config directory: %CONFIG_DIR%
 echo [INFO] Data directory: %DATA_DIR%
 
-REM Run the container
-%DOCKER_CMD%
+REM Build and run docker command directly (avoids quote issues in PowerShell)
+REM We use call to ensure proper execution in both CMD and PowerShell
+
+set "AGENTS_MOUNT="
+if exist "%SCRIPT_DIR%\AGENTS.md" (
+    set "AGENTS_MOUNT=-v "%SCRIPT_DIR%\AGENTS.md:%CONTAINER_HOME%/.config/opencode/AGENTS.md:ro""
+)
+
+set "ENV_VARS="
+if defined ANTHROPIC_API_KEY set "ENV_VARS=!ENV_VARS! -e ANTHROPIC_API_KEY=!ANTHROPIC_API_KEY!"
+if defined OPENAI_API_KEY set "ENV_VARS=!ENV_VARS! -e OPENAI_API_KEY=!OPENAI_API_KEY!"
+
+if "%START_SHELL%"=="true" (
+    echo [INFO] Starting shell in container...
+    docker run --rm -it ^
+        -v "%WORK_DIR%:/work" ^
+        -v "%CONFIG_DIR%:%CONTAINER_HOME%/.config/opencode" ^
+        -v "%DATA_DIR%:%CONTAINER_HOME%/.local/share/opencode" ^
+        %AGENTS_MOUNT% ^
+        -w /work ^
+        -e TERM=xterm-256color ^
+        %ENV_VARS% ^
+        %IMAGE_NAME% /bin/bash
+) else (
+    docker run --rm -it ^
+        -v "%WORK_DIR%:/work" ^
+        -v "%CONFIG_DIR%:%CONTAINER_HOME%/.config/opencode" ^
+        -v "%DATA_DIR%:%CONTAINER_HOME%/.local/share/opencode" ^
+        %AGENTS_MOUNT% ^
+        -w /work ^
+        -e TERM=xterm-256color ^
+        %ENV_VARS% ^
+        %IMAGE_NAME% opencode !OPENCODE_ARGS!
+)
 goto :eof
 
 :show_help
