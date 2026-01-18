@@ -11,6 +11,25 @@
 
 $ErrorActionPreference = "Stop"
 
+# Parse command line arguments
+param(
+    [switch]$y,
+    [switch]$yes,
+    [switch]$h,
+    [switch]$help
+)
+
+$YesToAll = $y -or $yes
+
+if ($h -or $help) {
+    Write-Host "Usage: .\setup.ps1 [-y|-yes]"
+    Write-Host ""
+    Write-Host "Options:"
+    Write-Host "  -y, -yes    Answer yes to all prompts (non-interactive mode)"
+    Write-Host "  -h, -help   Show this help message"
+    exit 0
+}
+
 # Get the directory where this script is located
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
@@ -86,34 +105,75 @@ function $AliasName {
 }
 "@
 
-# Ensure profile exists
-if (-not (Test-Path $PROFILE)) {
-    Write-Info "Creating PowerShell profile at $PROFILE"
-    $ProfileDir = Split-Path -Parent $PROFILE
-    if (-not (Test-Path $ProfileDir)) {
-        New-Item -ItemType Directory -Path $ProfileDir -Force | Out-Null
+# Check if function already exists and is correctly configured
+$ProfileExists = Test-Path $PROFILE
+$AlreadyConfigured = $false
+$NeedsUpdate = $false
+
+if ($ProfileExists) {
+    $ProfileContent = Get-Content $PROFILE -Raw -ErrorAction SilentlyContinue
+    if ($ProfileContent -match "function $AliasName") {
+        if ($ProfileContent -match [regex]::Escape($LauncherPath)) {
+            $AlreadyConfigured = $true
+        } else {
+            $NeedsUpdate = $true
+        }
     }
-    New-Item -ItemType File -Path $PROFILE -Force | Out-Null
 }
 
-# Check if function already exists
-$ProfileContent = Get-Content $PROFILE -Raw -ErrorAction SilentlyContinue
-if ($ProfileContent -match "function $AliasName") {
-    # Check if it points to the correct path
-    if ($ProfileContent -match [regex]::Escape($LauncherPath)) {
-        Write-Info "Function '$AliasName' already configured correctly in profile."
-    } else {
-        Write-Warn "Updating existing '$AliasName' function in profile..."
-        # Remove old function definition (handles multi-line)
-        $ProfileContent = $ProfileContent -replace "(?ms)# OpenCode Docker function\r?\nfunction $AliasName \{[^}]+\}\r?\n?", ""
-        $ProfileContent = $ProfileContent.TrimEnd() + $FunctionDefinition
-        Set-Content -Path $PROFILE -Value $ProfileContent
-        Write-Info "Updated function in $PROFILE"
-    }
+if ($AlreadyConfigured) {
+    Write-Info "Function '$AliasName' already configured correctly in profile."
 } else {
-    # Add the function
-    Add-Content -Path $PROFILE -Value $FunctionDefinition
-    Write-Info "Added function to $PROFILE"
+    # Ask for confirmation before modifying PowerShell profile
+    Write-Host ""
+    if ($NeedsUpdate) {
+        Write-Info "This will update the '$AliasName' function in your PowerShell profile:"
+    } else {
+        Write-Info "This will add the '$AliasName' function to your PowerShell profile:"
+    }
+    Write-Host "    $PROFILE"
+    Write-Host ""
+    Write-Host "The following function will be added:"
+    Write-Host "    function $AliasName { & `"$LauncherPath`" @args }"
+    Write-Host ""
+    
+    if ($YesToAll) {
+        $ModifyProfile = "Y"
+        Write-Info "Auto-accepting (-y flag provided)"
+    } else {
+        $ModifyProfile = Read-Host "Do you want to modify your PowerShell profile? [Y/n]"
+    }
+    Write-Host ""
+    
+    if ($ModifyProfile -eq "n" -or $ModifyProfile -eq "N") {
+        Write-Warn "Skipping profile configuration. Add this function manually to your profile:"
+        Write-Host ""
+        Write-Host "    function $AliasName { & `"$LauncherPath`" @args }"
+        Write-Host ""
+    } else {
+        # Ensure profile exists
+        if (-not $ProfileExists) {
+            Write-Info "Creating PowerShell profile at $PROFILE"
+            $ProfileDir = Split-Path -Parent $PROFILE
+            if (-not (Test-Path $ProfileDir)) {
+                New-Item -ItemType Directory -Path $ProfileDir -Force | Out-Null
+            }
+            New-Item -ItemType File -Path $PROFILE -Force | Out-Null
+        }
+
+        if ($NeedsUpdate) {
+            Write-Warn "Updating existing '$AliasName' function in profile..."
+            # Remove old function definition (handles multi-line)
+            $ProfileContent = $ProfileContent -replace "(?ms)# OpenCode Docker function\r?\nfunction $AliasName \{[^}]+\}\r?\n?", ""
+            $ProfileContent = $ProfileContent.TrimEnd() + $FunctionDefinition
+            Set-Content -Path $PROFILE -Value $ProfileContent
+            Write-Info "Updated function in $PROFILE"
+        } else {
+            # Add the function
+            Add-Content -Path $PROFILE -Value $FunctionDefinition
+            Write-Info "Added function to $PROFILE"
+        }
+    }
 }
 
 Write-Host ""

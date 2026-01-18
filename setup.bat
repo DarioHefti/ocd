@@ -11,6 +11,28 @@ REM
 REM After running this script, you can use 'ocd' from anywhere to launch opencode in Docker.
 REM
 
+REM Parse command line arguments
+set "YES_TO_ALL=false"
+:parse_args
+if "%~1"=="" goto done_args
+if /i "%~1"=="-y" set "YES_TO_ALL=true" & shift & goto parse_args
+if /i "%~1"=="--yes" set "YES_TO_ALL=true" & shift & goto parse_args
+if /i "%~1"=="-h" goto show_help
+if /i "%~1"=="--help" goto show_help
+echo Unknown option: %~1
+echo Use -h for help
+exit /b 1
+
+:show_help
+echo Usage: setup.bat [-y^|--yes]
+echo.
+echo Options:
+echo   -y, --yes    Answer yes to all prompts (non-interactive mode)
+echo   -h, --help   Show this help message
+exit /b 0
+
+:done_args
+
 REM Get the directory where this script is located
 set "SCRIPT_DIR=%~dp0"
 REM Remove trailing backslash
@@ -73,13 +95,34 @@ if not exist "%DATA_DIR%" (
 REM Create ocd.bat wrapper in the same directory
 echo [STEP] Creating shortcut command...
 set "OCD_BAT=%SCRIPT_DIR%\ocd.bat"
-(
-    echo @echo off
-    echo setlocal
-    echo call "%SCRIPT_DIR%\opencode-docker.bat" %%*
-    echo endlocal
-) > "%OCD_BAT%"
-echo [INFO] Created %OCD_BAT%
+
+REM Check if ocd.bat already exists
+if exist "%OCD_BAT%" (
+    echo [INFO] Shortcut command already exists at %OCD_BAT%
+) else (
+    echo.
+    echo This will create a shortcut command at:
+    echo     %OCD_BAT%
+    echo.
+    if "!YES_TO_ALL!"=="true" (
+        set "CREATE_OCD=Y"
+        echo [INFO] Auto-accepting ^(-y flag provided^)
+    ) else (
+        set /p "CREATE_OCD=Do you want to create the shortcut command? [Y/n]: "
+    )
+    if /i "!CREATE_OCD!"=="" set "CREATE_OCD=Y"
+    if /i "!CREATE_OCD!"=="Y" (
+        (
+            echo @echo off
+            echo setlocal
+            echo call "%SCRIPT_DIR%\opencode-docker.bat" %%*
+            echo endlocal
+        ) > "%OCD_BAT%"
+        echo [INFO] Created %OCD_BAT%
+    ) else (
+        echo [WARN] Skipping shortcut creation. You can run opencode-docker.bat directly.
+    )
+)
 
 REM Check if script directory is in PATH
 echo [STEP] Checking PATH configuration...
@@ -103,7 +146,12 @@ if errorlevel 1 (
     echo   [Environment]::SetEnvironmentVariable("Path", $env:Path + ";%SCRIPT_DIR%", "User")
     echo.
     
-    set /p "ADD_PATH=Would you like to add to PATH now? (requires new terminal) [Y/n]: "
+    if "!YES_TO_ALL!"=="true" (
+        set "ADD_PATH=Y"
+        echo [INFO] Auto-accepting ^(-y flag provided^)
+    ) else (
+        set /p "ADD_PATH=Would you like to add to PATH now? (requires new terminal) [Y/n]: "
+    )
     if /i "!ADD_PATH!"=="" set "ADD_PATH=Y"
     if /i "!ADD_PATH!"=="Y" (
         REM Add to user PATH using setx

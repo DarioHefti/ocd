@@ -15,6 +15,30 @@ set -e
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Parse command line arguments
+YES_TO_ALL=false
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -y|--yes)
+            YES_TO_ALL=true
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: $0 [-y|--yes]"
+            echo ""
+            echo "Options:"
+            echo "  -y, --yes    Answer yes to all prompts (non-interactive mode)"
+            echo "  -h, --help   Show this help message"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use -h for help"
+            exit 1
+            ;;
+    esac
+done
+
 # Colors for output (only if terminal supports it)
 if [[ -t 1 ]]; then
     RED=$'\033[0;31m'
@@ -162,19 +186,58 @@ if check_func_exists "$HOME/.zshrc" || check_func_exists "$HOME/.bashrc" || chec
     ALREADY_CONFIGURED=true
 fi
 
-# Check for zsh (common on macOS)
-if [[ -f "$HOME/.zshrc" ]]; then
-    add_func_to_file "$HOME/.zshrc" "zsh" && FUNC_ADDED=true
+# Determine which files would be modified
+SHELL_FILES_TO_MODIFY=()
+if [[ -f "$HOME/.zshrc" ]] && ! check_func_exists "$HOME/.zshrc"; then
+    SHELL_FILES_TO_MODIFY+=("$HOME/.zshrc")
+fi
+if [[ -f "$HOME/.bashrc" ]] && ! check_func_exists "$HOME/.bashrc"; then
+    SHELL_FILES_TO_MODIFY+=("$HOME/.bashrc")
+elif [[ -f "$HOME/.bash_profile" ]] && ! check_func_exists "$HOME/.bash_profile"; then
+    SHELL_FILES_TO_MODIFY+=("$HOME/.bash_profile")
 fi
 
-# Check for bash
-if [[ -f "$HOME/.bashrc" ]]; then
-    add_func_to_file "$HOME/.bashrc" "bash" && FUNC_ADDED=true
-elif [[ -f "$HOME/.bash_profile" ]]; then
-    add_func_to_file "$HOME/.bash_profile" "bash" && FUNC_ADDED=true
-fi
+# Ask for confirmation before modifying shell config files
+if [[ ${#SHELL_FILES_TO_MODIFY[@]} -gt 0 ]]; then
+    echo ""
+    log_info "This will add the '$ALIAS_NAME' function to:"
+    for file in "${SHELL_FILES_TO_MODIFY[@]}"; do
+        echo "    - $file"
+    done
+    echo ""
+    echo "The following line will be added:"
+    echo "    $FUNC_LINE"
+    echo ""
+    
+    if [[ "$YES_TO_ALL" == "true" ]]; then
+        MODIFY_SHELL="Y"
+        log_info "Auto-accepting (--yes flag provided)"
+    else
+        read -p "Do you want to modify these shell config files? [Y/n]: " -r MODIFY_SHELL
+    fi
+    echo ""
+    
+    if [[ "$MODIFY_SHELL" =~ ^[Nn]$ ]]; then
+        log_warn "Skipping shell configuration. Add this function manually to your shell config:"
+        echo ""
+        echo "    $FUNC_LINE"
+        echo ""
+    else
+        # Check for zsh (common on macOS)
+        if [[ -f "$HOME/.zshrc" ]]; then
+            add_func_to_file "$HOME/.zshrc" "zsh" && FUNC_ADDED=true
+        fi
 
-if [[ "$FUNC_ADDED" == "false" ]]; then
+        # Check for bash
+        if [[ -f "$HOME/.bashrc" ]]; then
+            add_func_to_file "$HOME/.bashrc" "bash" && FUNC_ADDED=true
+        elif [[ -f "$HOME/.bash_profile" ]]; then
+            add_func_to_file "$HOME/.bash_profile" "bash" && FUNC_ADDED=true
+        fi
+    fi
+elif [[ "$ALREADY_CONFIGURED" == "true" ]]; then
+    log_info "Shell function already configured correctly."
+else
     log_warn "Could not find shell config file. Add this function manually:"
     echo ""
     echo "    $FUNC_LINE"
