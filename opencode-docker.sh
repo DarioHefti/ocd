@@ -30,6 +30,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORK_DIR="$(pwd)"
 CONFIG_DIR="${HOME}/.config/opencode"
 DATA_DIR="${HOME}/.local/share/opencode"
+STATE_DIR="${HOME}/.local/state/opencode"
 FORCE_BUILD=false
 START_SHELL=false
 IMAGE_NAME="opencode-container:latest"
@@ -136,6 +137,15 @@ else
     DATA_DIR="$(cd "$DATA_DIR" && pwd)"
 fi
 
+if [[ -d "$STATE_DIR" ]]; then
+    STATE_DIR="$(cd "$STATE_DIR" && pwd)"
+else
+    log_warn "State directory does not exist: $STATE_DIR"
+    log_info "Creating state directory..."
+    mkdir -p "$STATE_DIR"
+    STATE_DIR="$(cd "$STATE_DIR" && pwd)"
+fi
+
 # Check if Docker is running
 if ! docker info &>/dev/null; then
     log_error "Docker is not running. Please start Docker and try again."
@@ -178,6 +188,11 @@ if [[ "$OSTYPE" == "linux"* ]]; then
         sudo chown -R "$HOST_UID:$HOST_GID" "$DATA_DIR" 2>/dev/null || \
             log_error "Could not fix ownership of $DATA_DIR - run: sudo chown -R \$(id -u):\$(id -g) $DATA_DIR"
     fi
+    if [[ -d "$STATE_DIR" ]] && [[ "$(stat -c '%u' "$STATE_DIR" 2>/dev/null)" == "0" ]]; then
+        log_warn "State directory is owned by root, fixing ownership..."
+        sudo chown -R "$HOST_UID:$HOST_GID" "$STATE_DIR" 2>/dev/null || \
+            log_error "Could not fix ownership of $STATE_DIR - run: sudo chown -R \$(id -u):\$(id -g) $STATE_DIR"
+    fi
 else
     # On macOS, Docker Desktop handles file ownership automatically
     CONTAINER_HOME="/root"
@@ -204,6 +219,7 @@ DOCKER_CMD+=(
     -v "$WORK_DIR:/work"
     -v "$CONFIG_DIR:$CONTAINER_HOME/.config/opencode"
     -v "$DATA_DIR:$CONTAINER_HOME/.local/share/opencode"
+    -v "$STATE_DIR:$CONTAINER_HOME/.local/state/opencode"
     -w /work
     -e "TERM=${TERM:-xterm-256color}"
     -e "HOME=$CONTAINER_HOME"
@@ -241,6 +257,7 @@ fi
 log_info "Work directory: $WORK_DIR"
 log_info "Config directory: $CONFIG_DIR"
 log_info "Data directory: $DATA_DIR"
+log_info "State directory: $STATE_DIR"
 
 # Run the container
 exec "${DOCKER_CMD[@]}"
