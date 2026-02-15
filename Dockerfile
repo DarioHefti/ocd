@@ -24,6 +24,13 @@ RUN ln -sf /usr/bin/fdfind /usr/bin/fd
 # Install opencode globally
 RUN npm i -g opencode-ai
 
+# Create opencode user home directory with proper structure for non-root execution
+# This allows running with --user flag while still having a writable home directory
+RUN mkdir -p /home/opencode/.config/opencode \
+    /home/opencode/.local/share/opencode \
+    /home/opencode/.local/state \
+    && chmod -R 777 /home/opencode
+
 # Set up working directory
 WORKDIR /work
 

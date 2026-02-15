@@ -158,8 +158,31 @@ if [[ -z "$IMAGE_EXISTS" ]] || [[ "$FORCE_BUILD" == "true" ]]; then
     log_info "Docker image built successfully."
 fi
 
-# Container user home directory (change if running as non-root)
-CONTAINER_HOME="/root"
+# Get host user/group IDs for file ownership (Linux only)
+HOST_UID=$(id -u)
+HOST_GID=$(id -g)
+
+# Use non-root user on Linux to fix file ownership issues
+if [[ "$OSTYPE" == "linux"* ]]; then
+    CONTAINER_HOME="/home/opencode"
+    RUN_AS_USER=true
+    
+    # Fix ownership of existing directories if they're owned by root
+    if [[ -d "$CONFIG_DIR" ]] && [[ "$(stat -c '%u' "$CONFIG_DIR" 2>/dev/null)" == "0" ]]; then
+        log_warn "Config directory is owned by root, fixing ownership..."
+        sudo chown -R "$HOST_UID:$HOST_GID" "$CONFIG_DIR" 2>/dev/null || \
+            log_error "Could not fix ownership of $CONFIG_DIR - run: sudo chown -R \$(id -u):\$(id -g) $CONFIG_DIR"
+    fi
+    if [[ -d "$DATA_DIR" ]] && [[ "$(stat -c '%u' "$DATA_DIR" 2>/dev/null)" == "0" ]]; then
+        log_warn "Data directory is owned by root, fixing ownership..."
+        sudo chown -R "$HOST_UID:$HOST_GID" "$DATA_DIR" 2>/dev/null || \
+            log_error "Could not fix ownership of $DATA_DIR - run: sudo chown -R \$(id -u):\$(id -g) $DATA_DIR"
+    fi
+else
+    # On macOS, Docker Desktop handles file ownership automatically
+    CONTAINER_HOME="/root"
+    RUN_AS_USER=false
+fi
 
 # Prepare docker run command
 DOCKER_CMD=(
@@ -183,7 +206,13 @@ DOCKER_CMD+=(
     -v "$DATA_DIR:$CONTAINER_HOME/.local/share/opencode"
     -w /work
     -e "TERM=${TERM:-xterm-256color}"
+    -e "HOME=$CONTAINER_HOME"
 )
+
+# Run as host user on Linux to fix file ownership
+if [[ "$RUN_AS_USER" == "true" ]]; then
+    DOCKER_CMD+=(--user "$HOST_UID:$HOST_GID")
+fi
 
 # Mount the container context file if it exists
 if [[ -f "$CONTAINER_AGENTS_MD" ]]; then
