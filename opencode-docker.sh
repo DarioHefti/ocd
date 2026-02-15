@@ -146,6 +146,32 @@ else
     STATE_DIR="$(cd "$STATE_DIR" && pwd)"
 fi
 
+# Copy container AGENTS.md to config directory
+# This ensures opencode always knows about the container environment
+CONTAINER_AGENTS_MD="$SCRIPT_DIR/AGENTS.md"
+if [[ -f "$CONTAINER_AGENTS_MD" ]]; then
+    CONFIG_AGENTS_MD="$CONFIG_DIR/AGENTS.md"
+    
+    # Check if we need to update (file doesn't exist, is empty, or doesn't contain container marker)
+    if [[ ! -f "$CONFIG_AGENTS_MD" ]] || [[ ! -s "$CONFIG_AGENTS_MD" ]] || ! grep -q "# Container Environment" "$CONFIG_AGENTS_MD" 2>/dev/null; then
+        log_info "Updating AGENTS.md with container environment info..."
+        
+        # If config AGENTS.md exists and has content (but no container section), append
+        if [[ -f "$CONFIG_AGENTS_MD" ]] && [[ -s "$CONFIG_AGENTS_MD" ]]; then
+            # Append container info with a separator
+            {
+                echo ""
+                echo "# --- Container Environment (auto-added by opencode-docker.sh) ---"
+                echo ""
+                cat "$CONTAINER_AGENTS_MD"
+            } >> "$CONFIG_AGENTS_MD"
+        else
+            # Just copy the container AGENTS.md
+            cp "$CONTAINER_AGENTS_MD" "$CONFIG_AGENTS_MD"
+        fi
+    fi
+fi
+
 # Check if Docker is running
 if ! docker info &>/dev/null; then
     log_error "Docker is not running. Please start Docker and try again."
@@ -212,9 +238,6 @@ else
     DOCKER_CMD+=(-i)
 fi
 
-# Mount the container AGENTS.md as a read-only file in the config directory
-CONTAINER_AGENTS_MD="$SCRIPT_DIR/AGENTS.md"
-
 DOCKER_CMD+=(
     -v "$WORK_DIR:/work"
     -v "$CONFIG_DIR:$CONTAINER_HOME/.config/opencode"
@@ -228,11 +251,6 @@ DOCKER_CMD+=(
 # Run as host user on Linux to fix file ownership
 if [[ "$RUN_AS_USER" == "true" ]]; then
     DOCKER_CMD+=(--user "$HOST_UID:$HOST_GID")
-fi
-
-# Mount the container context file if it exists
-if [[ -f "$CONTAINER_AGENTS_MD" ]]; then
-    DOCKER_CMD+=(-v "$CONTAINER_AGENTS_MD:$CONTAINER_HOME/.config/opencode/AGENTS.md:ro")
 fi
 
 # Pass through API keys if they exist in the environment
